@@ -7,7 +7,7 @@ import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
 
-class ExampleDataset(tfds.core.GeneratorBasedBuilder):
+class RobosuiteV1Dataset(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
@@ -25,30 +25,39 @@ class ExampleDataset(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
+                        'qpos': tfds.features.Tensor(
+                            shape=(7,),
+                            dtype=np.float32,
+                            doc='Robot joint angles.'
+                        ),
+                        'qvel': tfds.features.Tensor(
+                            shape=(7,),
+                            dtype=np.float32,
+                            doc='Robot joint velocities.'
+                        ),
+                        'eef_pose': tfds.features.Tensor(
+                            shape=(7,),
+                            dtype=np.float32,
+                            doc='End effector pose, including the gripper.'
+                        ),                            
                         'image': tfds.features.Image(
-                            shape=(64, 64, 3),
+                            shape=(84, 84, 3),
                             dtype=np.uint8,
                             encoding_format='png',
                             doc='Main camera RGB observation.',
                         ),
-                        'wrist_image': tfds.features.Image(
-                            shape=(64, 64, 3),
-                            dtype=np.uint8,
-                            encoding_format='png',
-                            doc='Wrist camera RGB observation.',
-                        ),
-                        'state': tfds.features.Tensor(
-                            shape=(10,),
-                            dtype=np.float32,
-                            doc='Robot state, consists of [7x robot joint angles, '
-                                '2x gripper position, 1x door opening angle].',
-                        )
+                        # 'side_image': tfds.features.Image(
+                        #     shape=(84, 84, 3),
+                        #     dtype=np.uint8,
+                        #     encoding_format='png',
+                        #     doc='Side camera RGB observation.',
+                        # ),
                     }),
                     'action': tfds.features.Tensor(
-                        shape=(10,),
+                        shape=(8,),
                         dtype=np.float32,
-                        doc='Robot action, consists of [7x joint velocities, '
-                            '2x gripper velocities, 1x terminate episode].',
+                        doc='Robot action, consists of [7x joint torque, '
+                            '1x gripper action].',
                     ),
                     'discount': tfds.features.Scalar(
                         dtype=np.float32,
@@ -90,8 +99,9 @@ class ExampleDataset(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
         return {
-            'train': self._generate_examples(path='data/train/episode_*.npy'),
-            'val': self._generate_examples(path='data/val/episode_*.npy'),
+            # Hardcoded for now, but this should be a param
+            'train': self._generate_examples(path='/octo_force_learning/modified_datasets/episode_*.npy'),
+            # 'val': self._generate_examples(path='data/val/episode_*.npy'),
         }
 
     def _generate_examples(self, path) -> Iterator[Tuple[str, Any]]:
@@ -109,9 +119,12 @@ class ExampleDataset(tfds.core.GeneratorBasedBuilder):
 
                 episode.append({
                     'observation': {
+                        'qpos': step['qpos'],
+                        'qvel': step['qvel'],
+                        'eef_pose': step['eef_pose'],
                         'image': step['image'],
-                        'wrist_image': step['wrist_image'],
-                        'state': step['state'],
+                        # 'side_image': step['side_image'],
+                        # 'state': step['state'],
                     },
                     'action': step['action'],
                     'discount': 1.0,
